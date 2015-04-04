@@ -1,6 +1,7 @@
 #!/usr/bin/env roseus
 
 ;;(ros::load-ros-manifest "arm_navigation_msgs")
+(ros::load-ros-manifest "jsk_recognition_msgs")
 (ros::load-ros-manifest "jsk_interactive")
 (ros::load-ros-manifest "jsk_interactive_marker")
 (ros::roseus "move_joint_interface")

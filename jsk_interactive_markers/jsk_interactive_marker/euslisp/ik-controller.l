@@ -3,6 +3,8 @@
 (ros::load-ros-manifest "roseus")
 (ros::load-ros-manifest "move_base_msgs")
 
+(ros::load-ros-manifest "jsk_footstep_msgs")
+(ros::load-ros-manifest "jsk_recognition_msgs")
 (ros::load-ros-manifest "moveit_msgs")
 (ros::load-ros-manifest "jsk_pcl_ros")
 (ros::load-ros-manifest "jsk_interactive_marker")
@@ -52,7 +54,7 @@
 
   (:robot-marker-joint-state-subscriber
    (msg)
-   (format t "[robot-marker-joint-state-subscriber] called ")
+   ;;(format t "[robot-marker-joint-state-subscriber] called ")
    (apply-joint_state msg *robot*)
    (send self :fix-robot-coords)
    (when (boundp '*irtviewer*) (send *irtviewer* :draw-objects))
@@ -322,9 +324,12 @@
 	  (cds (ros::tf-pose-stamped->coords pose))
 	  map->marker
 	  )
-     (setq cds (send self :get-eus-coords cds (send pose :header)))
-     (send *target-coords* :move-to (send (car (send *real-robot* :links)) :copy-worldcoords) :world)
-     (send *target-coords* :transform cds :local)
+     ;;(setq cds (send self :get-eus-coords cds (send pose :header)))
+     ;;(send *target-coords* :move-to (send (car (send *real-robot* :links)) :copy-worldcoords) :world)
+     ;;(send *target-coords* :transform cds :local)
+     (setq *target-coords*
+           (send (send (send *robot* :foot-midcoords) :copy-worldcoords) :transform
+                 (send (send (send *foot-midcoords* :copy-worldcoords) :inverse-transformation) :transform cds)))
 
      ;;set *tmp-rotation-axis*
      (cond
@@ -336,6 +341,11 @@
        (send *irtviewer* :draw-objects))
      )
    (send self :update-target-coords)
+   )
+
+  (:robot-pose-callback
+   (msg)
+   (setq *foot-midcoords* (ros::tf-pose-stamped->coords msg))
    )
 
   (:update-target-coords
@@ -719,7 +729,7 @@
    (print "update target")
    )
 
-  (:get-eus-coords
+  (:get-eus-coords ;; convert to coords relative to BODY
    (cds header)
    (let (origin->frame
 	 (frame-id (send header :frame_id))
@@ -730,7 +740,9 @@
      (dotimes (i wait-times)
        (setq origin->frame
 	     (send *tfl* :lookup-transform
+                   ;;(format nil "/~A" "jsk_model_marker_interface/robot/BODY") frame-id time))
 		   *robot-origin* frame-id time))
+       (format t "hogehoge: ~a~%" origin->frame)
        (cond
 	(origin->frame
 	 (send cds :transform origin->frame :world)
@@ -740,7 +752,8 @@
 	 (ros::ros-info "~A -> ~A cannot transform yet" *robot-origin* frame-id)
 	 (unix:sleep 1)
 	 (ros::sleep)
-	 ))))
+	 )))
+     )
    nil
    )
 
@@ -794,6 +807,7 @@
    (defvar *origin-coords* (instance arrow-object :init)) ;;arrow for origin of object
    (send *origin-coords* :translate #f(500 0 0))
    (defvar *old-coords* (send *target-coords* :copy-worldcoords))
+   (defvar *foot-midcoords* (make-coords))
    (defvar *use-fullbody* t)
    (defvar *use-torso* nil)
    (defvar *translation-axis* t)
@@ -936,6 +950,7 @@
 	    "/~A/joint_states_decompressed" *robot-topic-name*)
     sensor_msgs::JointState
     #'send self :joint-state-subscriber 1)
+   (ros::subscribe "/urdf_control_marker/pose" geometry_msgs::PoseStamped #'send self :robot-pose-callback)
 
    ;;Update Interactive Marker
    (ros::advertise
@@ -1209,7 +1224,7 @@
 	    ((if *use-ik-server* (= (send ik-server-res :error_code :val) moveit_msgs::MoveItErrorCodes::*SUCCESS*) (vectorp ik-suc))
 	     (setq revert-if-fail t)
 	     (send self :publish-ik-status (format nil " IK SUCCESS"))
-	     (print (send *robot* :angle-vector))
+	     ;;(print (send *robot* :angle-vector))
 	     (if *publish-ik*
 		 (send self :publish-joint-states :real? nil)))
 	    (t ;(evenp (random 2))
