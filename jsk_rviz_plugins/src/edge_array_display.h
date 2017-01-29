@@ -33,12 +33,11 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#ifndef JSK_RVIZ_PLUGINS_BOUDNING_BOX_ARRAY_DISPLAY_H_
-#define JSK_RVIZ_PLUGINS_BOUDNING_BOX_ARRAY_DISPLAY_H_
+#ifndef JSK_RVIZ_PLUGINS_EDGE_ARRAY_DISPLAY_H_
+#define JSK_RVIZ_PLUGINS_EDGE_ARRAY_DISPLAY_H_
 
 #ifndef Q_MOC_RUN
-#include "bounding_box_display_common.h"
-#include <jsk_recognition_msgs/BoundingBoxArray.h>
+#include <jsk_recognition_msgs/EdgeArray.h>
 #include <rviz/properties/color_property.h>
 #include <rviz/properties/bool_property.h>
 #include <rviz/properties/float_property.h>
@@ -52,40 +51,42 @@
 
 namespace jsk_rviz_plugins
 {
-
-  class BoundingBoxArrayDisplay: public BoundingBoxDisplayCommon<jsk_recognition_msgs::BoundingBoxArray>
+  class EdgeArrayDisplay:
+    public rviz::MessageFilterDisplay<jsk_recognition_msgs::EdgeArray>
   {
     Q_OBJECT
   public:
-    BoundingBoxArrayDisplay();
-    virtual ~BoundingBoxArrayDisplay();
+    typedef boost::shared_ptr<rviz::BillboardLine> BillboardLinePtr;
+    EdgeArrayDisplay();
+    virtual ~EdgeArrayDisplay();
   protected:
-    void onInitialize();
+    virtual void onInitialize();
     virtual void reset();
+    void allocateBillboardLines(int num);
+    QColor getColor(size_t index);
+    virtual void showEdges(
+      const jsk_recognition_msgs::EdgeArray::ConstPtr& msg);
 
-    bool only_edge_;
-    bool show_coords_;
-    // Properties
     rviz::EnumProperty* coloring_property_;
     rviz::ColorProperty* color_property_;
     rviz::FloatProperty* alpha_property_;
-    rviz::BoolProperty* only_edge_property_;
     rviz::FloatProperty* line_width_property_;
-    rviz::BoolProperty* show_coords_property_;
+    QColor color_;
+    double alpha_;
+    std::string coloring_method_;
+    double line_width_;
+    std::vector<BillboardLinePtr> edges_;
 
-    jsk_recognition_msgs::BoundingBoxArray::ConstPtr latest_msg_;
-  protected Q_SLOTS:
+    jsk_recognition_msgs::EdgeArray::ConstPtr latest_msg_;
+  private Q_SLOTS:
     void updateColor();
     void updateAlpha();
-    void updateOnlyEdge();
     void updateColoring();
     void updateLineWidth();
-    void updateShowCoords();
   private:
     void processMessage(
-      const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& msg);
+      const jsk_recognition_msgs::EdgeArray::ConstPtr& msg);
   };
 
-}  // namespace jsk_rviz_plugins
-
-#endif  // JSK_RVIZ_PLUGINS_BOUDNING_BOX_ARRAY_DISPLAY_H_
+}
+#endif

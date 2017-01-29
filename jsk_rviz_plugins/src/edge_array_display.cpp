@@ -32,68 +32,66 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#include "bounding_box_display_common.h"
-#include "bounding_box_array_display.h"
+#include "edge_array_display.h"
 #include <jsk_topic_tools/color_utils.h>
-
 namespace jsk_rviz_plugins
 {
-
-  BoundingBoxArrayDisplay::BoundingBoxArrayDisplay()
+  EdgeArrayDisplay::EdgeArrayDisplay()
   {
     coloring_property_ = new rviz::EnumProperty(
       "coloring", "Auto",
       "coloring method",
       this, SLOT(updateColoring()));
+    coloring_property_->addOption("Auto", 0);
     coloring_property_->addOption("Flat color", 1);
-    coloring_property_->addOption("Label", 2);
-    coloring_property_->addOption("Value", 3);
 
     color_property_ = new rviz::ColorProperty(
       "color", QColor(25, 255, 0),
-      "color to draw the bounding boxes",
+      "color to draw the edges",
       this, SLOT(updateColor()));
     alpha_property_ = new rviz::FloatProperty(
       "alpha", 0.8,
-      "alpha value to draw the bounding boxes",
+      "alpha value to draw the edges",
       this, SLOT(updateAlpha()));
-    only_edge_property_ = new rviz::BoolProperty(
-      "only edge", false,
-      "show only the edges of the boxes",
-      this, SLOT(updateOnlyEdge()));
     line_width_property_ = new rviz::FloatProperty(
       "line width", 0.005,
       "line width of the edges",
       this, SLOT(updateLineWidth()));
-    show_coords_property_ = new rviz::BoolProperty(
-      "show coords", false,
-      "show coordinate of bounding box",
-      this, SLOT(updateShowCoords()));
   }
 
-  BoundingBoxArrayDisplay::~BoundingBoxArrayDisplay()
+  EdgeArrayDisplay::~EdgeArrayDisplay()
   {
     delete color_property_;
     delete alpha_property_;
-    delete only_edge_property_;
     delete coloring_property_;
-    delete show_coords_property_;
   }
 
-  void BoundingBoxArrayDisplay::onInitialize()
+  QColor EdgeArrayDisplay::getColor(size_t index)
+  {
+    if (coloring_method_ == "auto") {
+      std_msgs::ColorRGBA ros_color = jsk_topic_tools::colorCategory20(index);
+      return QColor(ros_color.r * 255.0,
+                    ros_color.g * 255.0,
+                    ros_color.b * 255.0,
+                    ros_color.a * 255.0);
+    }
+    else if (coloring_method_ == "flat") {
+      return color_;
+    }
+  }
+
+  void EdgeArrayDisplay::onInitialize()
   {
     MFDClass::onInitialize();
     scene_node_ = scene_manager_->getRootSceneNode()->createChildSceneNode();
 
     updateColor();
     updateAlpha();
-    updateOnlyEdge();
     updateColoring();
     updateLineWidth();
-    updateShowCoords();
   }
 
-  void BoundingBoxArrayDisplay::updateLineWidth()
+  void EdgeArrayDisplay::updateLineWidth()
   {
     line_width_ = line_width_property_->getFloat();
     if (latest_msg_) {
@@ -101,7 +99,7 @@ namespace jsk_rviz_plugins
     }
   }
 
-  void BoundingBoxArrayDisplay::updateColor()
+  void EdgeArrayDisplay::updateColor()
   {
     color_ = color_property_->getColor();
     if (latest_msg_) {
@@ -109,7 +107,7 @@ namespace jsk_rviz_plugins
     }
   }
 
-  void BoundingBoxArrayDisplay::updateAlpha()
+  void EdgeArrayDisplay::updateAlpha()
   {
     alpha_ = alpha_property_->getFloat();
     if (latest_msg_) {
@@ -117,27 +115,7 @@ namespace jsk_rviz_plugins
     }
   }
 
-  void BoundingBoxArrayDisplay::updateOnlyEdge()
-  {
-    only_edge_ = only_edge_property_->getBool();
-    if (only_edge_) {
-      line_width_property_->show();
-    }
-    else {
-      line_width_property_->hide();;
-    }
-    // Imediately apply attribute
-    if (latest_msg_) {
-      if (only_edge_) {
-        showEdges(latest_msg_);
-      }
-      else {
-        showBoxes(latest_msg_);
-      }
-    }
-  }
-
-  void BoundingBoxArrayDisplay::updateColoring()
+  void EdgeArrayDisplay::updateColoring()
   {
     if (coloring_property_->getOptionInt() == 0) {
       coloring_method_ = "auto";
@@ -147,64 +125,86 @@ namespace jsk_rviz_plugins
       coloring_method_ = "flat";
       color_property_->show();
     }
-    else if (coloring_property_->getOptionInt() == 2) {
-      coloring_method_ = "label";
-      color_property_->hide();
-    }
-    else if (coloring_property_->getOptionInt() == 3) {
-      coloring_method_ = "value";
-      color_property_->hide();
-    }
 
     if (latest_msg_) {
       processMessage(latest_msg_);
     }
   }
 
-  void BoundingBoxArrayDisplay::updateShowCoords()
-  {
-    show_coords_ = show_coords_property_->getBool();
-    // Immediately apply show_coords attribute
-    if (!show_coords_) {
-      hideCoords();
-    }
-    else if (show_coords_ && latest_msg_) {
-      showCoords(latest_msg_);
-    }
-  }
-
-  void BoundingBoxArrayDisplay::reset()
+  void EdgeArrayDisplay::reset()
   {
     MFDClass::reset();
-    shapes_.clear();
     edges_.clear();
-    coords_nodes_.clear();
-    coords_objects_.clear();
     latest_msg_.reset();
   }
 
-  void BoundingBoxArrayDisplay::processMessage(
-    const jsk_recognition_msgs::BoundingBoxArray::ConstPtr& msg)
+  void EdgeArrayDisplay::allocateBillboardLines(int num)
+  {
+    if (num > edges_.size()) {
+      for (size_t i = edges_.size(); i < num; i++) {
+        BillboardLinePtr line(new rviz::BillboardLine(
+                                                      this->context_->getSceneManager(), this->scene_node_));
+        edges_.push_back(line);
+      }
+    }
+    else if (num < edges_.size())
+      {
+        edges_.resize(num);       // ok??
+      }
+  }
+
+  void EdgeArrayDisplay::showEdges(
+    const jsk_recognition_msgs::EdgeArray::ConstPtr& msg)
+  {
+    allocateBillboardLines(msg->edges.size());
+    for (size_t i = 0; i < msg->edges.size(); i++) {
+      jsk_recognition_msgs::Edge edge_msg = msg->edges[i];
+
+      BillboardLinePtr edge = edges_[i];
+      edge->clear();
+
+      geometry_msgs::Pose start_pose_local;
+      geometry_msgs::Pose end_pose_local;
+      start_pose_local.position = edge_msg.start_point;
+      start_pose_local.orientation.w = 1.0;
+      end_pose_local.position = edge_msg.end_point;
+      end_pose_local.orientation.w = 1.0;
+
+      Ogre::Vector3 start_point;
+      Ogre::Vector3 end_point;
+      Ogre::Quaternion quaternion; // not used to visualize
+      bool transform_ret;
+      transform_ret =
+        context_->getFrameManager()->transform(edge_msg.header, start_pose_local, start_point, quaternion)
+        && context_->getFrameManager()->transform(edge_msg.header, end_pose_local, end_point, quaternion);
+      if(!transform_ret) {
+        ROS_ERROR( "Error transforming pose"
+                   "'%s' from frame '%s' to frame '%s'",
+                   qPrintable( getName() ), edge_msg.header.frame_id.c_str(),
+                   qPrintable( fixed_frame_ ));
+        return;                 // return?
+      }
+      edge->addPoint(start_point);
+      edge->addPoint(end_point);
+      edge->setLineWidth(line_width_);
+      QColor color = getColor(i);
+      edge->setColor(color.red() / 255.0,
+                     color.green() / 255.0,
+                     color.blue() / 255.0,
+                     alpha_);
+    }
+  }
+
+  void EdgeArrayDisplay::processMessage(
+    const jsk_recognition_msgs::EdgeArray::ConstPtr& msg)
   {
     // Store latest message
     latest_msg_ = msg;
 
-    if (!only_edge_) {
-      showBoxes(msg);
-    }
-    else {
-      showEdges(msg);
-    }
-
-    if (show_coords_) {
-      showCoords(msg);
-    }
-    else {
-      hideCoords();
-    }
+    showEdges(msg);
   }
-
-}  // namespace jsk_rviz_plugins
+}
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(jsk_rviz_plugins::BoundingBoxArrayDisplay, rviz::Display)
+PLUGINLIB_EXPORT_CLASS(
+  jsk_rviz_plugins::EdgeArrayDisplay, rviz::Display)
