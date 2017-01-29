@@ -44,7 +44,7 @@
 #include <rviz/properties/enum_property.h>
 #include <rviz/message_filter_display.h>
 #include <rviz/ogre_helpers/shape.h>
-#include <rviz/ogre_helpers/line.h>
+#include <rviz/ogre_helpers/billboard_line.h>
 #include <rviz/ogre_helpers/arrow.h>
 #include <OGRE/OgreSceneNode.h>
 #endif
@@ -56,13 +56,13 @@ namespace jsk_rviz_plugins
   {
     Q_OBJECT
   public:
-    typedef boost::shared_ptr<rviz::Line> LinePtr;
+    typedef boost::shared_ptr<rviz::BillboardLine> BillboardLinePtr;
     EdgeArrayDisplay();
     virtual ~EdgeArrayDisplay();
   protected:
     virtual void onInitialize();
     virtual void reset();
-    void allocateLines(int num);
+    void allocateBillboardLines(int num);
     QColor getColor(size_t index);
     virtual void showEdges(
       const jsk_recognition_msgs::EdgeArray::ConstPtr& msg);
@@ -75,7 +75,7 @@ namespace jsk_rviz_plugins
     double alpha_;
     std::string coloring_method_;
     double line_width_;
-    std::vector<LinePtr> edges_;
+    std::vector<BillboardLinePtr> edges_;
 
     jsk_recognition_msgs::EdgeArray::ConstPtr latest_msg_;
   private Q_SLOTS:

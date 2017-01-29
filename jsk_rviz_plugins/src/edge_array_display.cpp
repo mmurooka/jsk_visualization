@@ -138,12 +138,12 @@ namespace jsk_rviz_plugins
     latest_msg_.reset();
   }
 
-  void EdgeArrayDisplay::allocateLines(int num)
+  void EdgeArrayDisplay::allocateBillboardLines(int num)
   {
     if (num > edges_.size()) {
       for (size_t i = edges_.size(); i < num; i++) {
-        LinePtr line(new rviz::Line(
-                                context_->getSceneManager(), scene_node_));
+        BillboardLinePtr line(new rviz::BillboardLine(
+                                                      this->context_->getSceneManager(), this->scene_node_));
         edges_.push_back(line);
       }
     }
@@ -156,11 +156,12 @@ namespace jsk_rviz_plugins
   void EdgeArrayDisplay::showEdges(
     const jsk_recognition_msgs::EdgeArray::ConstPtr& msg)
   {
-    allocateLines(msg->edges.size());
+    allocateBillboardLines(msg->edges.size());
     for (size_t i = 0; i < msg->edges.size(); i++) {
       jsk_recognition_msgs::Edge edge_msg = msg->edges[i];
 
-      LinePtr edge = edges_[i];
+      BillboardLinePtr edge = edges_[i];
+      edge->clear();
 
       geometry_msgs::Pose start_pose_local;
       geometry_msgs::Pose end_pose_local;
@@ -176,14 +177,16 @@ namespace jsk_rviz_plugins
       transform_ret =
         context_->getFrameManager()->transform(edge_msg.header, start_pose_local, start_point, quaternion)
         && context_->getFrameManager()->transform(edge_msg.header, end_pose_local, end_point, quaternion);
-        if(!transform_ret) {
-          ROS_ERROR( "Error transforming pose"
-                     "'%s' from frame '%s' to frame '%s'",
-                     qPrintable( getName() ), edge_msg.header.frame_id.c_str(),
-                     qPrintable( fixed_frame_ ));
-          return;                 // return?
-        }
-      edge->setPoints(start_point, end_point);
+      if(!transform_ret) {
+        ROS_ERROR( "Error transforming pose"
+                   "'%s' from frame '%s' to frame '%s'",
+                   qPrintable( getName() ), edge_msg.header.frame_id.c_str(),
+                   qPrintable( fixed_frame_ ));
+        return;                 // return?
+      }
+      edge->addPoint(start_point);
+      edge->addPoint(end_point);
+      edge->setLineWidth(line_width_);
       QColor color = getColor(i);
       edge->setColor(color.red() / 255.0,
                      color.green() / 255.0,
