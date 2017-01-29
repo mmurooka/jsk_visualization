@@ -154,28 +154,19 @@ namespace jsk_rviz_plugins
   }
 
   void EdgeArrayDisplay::showEdges(
-    const jsk_recognition_msgs::ModelCoefficientsArray::ConstPtr& msg)
+    const jsk_recognition_msgs::EdgeArray::ConstPtr& msg)
   {
-    allocateLines(msg->coefficients.size());
-    for (size_t i = 0; i < msg->coefficients.size(); i++) {
-      pcl_msgs::ModelCoefficients edge_coeff = msg->coefficients[i];
+    allocateLines(msg->edges.size());
+    for (size_t i = 0; i < msg->edges.size(); i++) {
+      jsk_recognition_msgs::Edge edge_msg = msg->edges[i];
 
       LinePtr edge = edges_[i];
 
-      Ogre::Vector3 center_local(edge_coeff.values[0], edge_coeff.values[1], edge_coeff.values[2]);
-      Ogre::Vector3 dir_local(edge_coeff.values[3], edge_coeff.values[4], edge_coeff.values[5]);
-      Ogre::Vector3 start_point_local(center_local + dir_local);
-      Ogre::Vector3 end_point_local(center_local - dir_local);
-
       geometry_msgs::Pose start_pose_local;
       geometry_msgs::Pose end_pose_local;
-      start_pose_local.position.x = start_point_local[0];
-      start_pose_local.position.y = start_point_local[1];
-      start_pose_local.position.z = start_point_local[2];
+      start_pose_local.position = edge_msg.start_point;
       start_pose_local.orientation.w = 1.0;
-      end_pose_local.position.x = end_point_local[0];
-      end_pose_local.position.y = end_point_local[1];
-      end_pose_local.position.z = end_point_local[2];
+      end_pose_local.position = edge_msg.end_point;
       end_pose_local.orientation.w = 1.0;
 
       Ogre::Vector3 start_point;
@@ -183,12 +174,12 @@ namespace jsk_rviz_plugins
       Ogre::Quaternion quaternion; // not used to visualize
       bool transform_ret;
       transform_ret =
-        context_->getFrameManager()->transform(edge_coeff.header, start_pose_local, start_point, quaternion)
-        && context_->getFrameManager()->transform(edge_coeff.header, end_pose_local, end_point, quaternion);
+        context_->getFrameManager()->transform(edge_msg.header, start_pose_local, start_point, quaternion)
+        && context_->getFrameManager()->transform(edge_msg.header, end_pose_local, end_point, quaternion);
         if(!transform_ret) {
           ROS_ERROR( "Error transforming pose"
                      "'%s' from frame '%s' to frame '%s'",
-                     qPrintable( getName() ), edge_coeff.header.frame_id.c_str(),
+                     qPrintable( getName() ), edge_msg.header.frame_id.c_str(),
                      qPrintable( fixed_frame_ ));
           return;                 // return?
         }
@@ -202,7 +193,7 @@ namespace jsk_rviz_plugins
   }
 
   void EdgeArrayDisplay::processMessage(
-    const jsk_recognition_msgs::ModelCoefficientsArray::ConstPtr& msg)
+    const jsk_recognition_msgs::EdgeArray::ConstPtr& msg)
   {
     // Store latest message
     latest_msg_ = msg;

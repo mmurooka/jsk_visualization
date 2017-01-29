@@ -37,7 +37,7 @@
 #define JSK_RVIZ_PLUGINS_EDGE_ARRAY_DISPLAY_H_
 
 #ifndef Q_MOC_RUN
-#include <jsk_recognition_msgs/ModelCoefficientsArray.h>
+#include <jsk_recognition_msgs/EdgeArray.h>
 #include <rviz/properties/color_property.h>
 #include <rviz/properties/bool_property.h>
 #include <rviz/properties/float_property.h>
@@ -52,7 +52,7 @@
 namespace jsk_rviz_plugins
 {
   class EdgeArrayDisplay:
-    public rviz::MessageFilterDisplay<jsk_recognition_msgs::ModelCoefficientsArray>
+    public rviz::MessageFilterDisplay<jsk_recognition_msgs::EdgeArray>
   {
     Q_OBJECT
   public:
@@ -65,7 +65,7 @@ namespace jsk_rviz_plugins
     void allocateLines(int num);
     QColor getColor(size_t index);
     virtual void showEdges(
-      const jsk_recognition_msgs::ModelCoefficientsArray::ConstPtr& msg);
+      const jsk_recognition_msgs::EdgeArray::ConstPtr& msg);
 
     rviz::EnumProperty* coloring_property_;
     rviz::ColorProperty* color_property_;
@@ -77,7 +77,7 @@ namespace jsk_rviz_plugins
     double line_width_;
     std::vector<LinePtr> edges_;
 
-    jsk_recognition_msgs::ModelCoefficientsArray::ConstPtr latest_msg_;
+    jsk_recognition_msgs::EdgeArray::ConstPtr latest_msg_;
   private Q_SLOTS:
     void updateColor();
     void updateAlpha();
@@ -85,7 +85,7 @@ namespace jsk_rviz_plugins
     void updateLineWidth();
   private:
     void processMessage(
-      const jsk_recognition_msgs::ModelCoefficientsArray::ConstPtr& msg);
+      const jsk_recognition_msgs::EdgeArray::ConstPtr& msg);
   };
 
 }
