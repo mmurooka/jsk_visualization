@@ -27,21 +27,28 @@ def find_mesh(link_name):
     for link in g_links:
         if link_name == link.getAttribute('name'):
             visual = link.getElementsByTagName('visual').item(0)
-            visual_mesh = visual.getElementsByTagName('mesh').item(0)
+
+            pose = Pose()
             if len(visual.getElementsByTagName("origin")) > 0:
                 origin = visual.getElementsByTagName("origin").item(0)
-                pose = Pose()
                 if origin.getAttribute("xyz"):
                     pose.position.x, pose.position.y, pose.position.z = [float(v) for v in origin.getAttribute("xyz").split()]
                 if origin.getAttribute("rpy"):
                     r, p, y = [float(v) for v in origin.getAttribute("rpy").split()]
                     q = quaternion_from_euler(r, p, y)
                     pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w = q
-                    return (visual_mesh.getAttribute('filename'), pose)
             else:
-                pose = Pose()
                 pose.orientation.w = 1
-                return (visual_mesh.getAttribute('filename'), pose)
+
+            if visual.getElementsByTagName('mesh'):
+                visual_mesh = visual.getElementsByTagName('mesh').item(0)
+                return ('mesh', visual_mesh.getAttribute('filename'), pose)
+            elif visual.getElementsByTagName('box'):
+                box = visual.getElementsByTagName('box').item(0)
+                box_size = [float(v) for v in box.getAttribute('size').split()]
+                return ('box', box_size, pose)
+            else:
+                rospy.logerr('geometry of link {0} not found'.format(link_name))
     raise Exception("Cannot find link: {0}".format(link_name))
 
 def callback(msgs):
@@ -57,10 +64,20 @@ def callback(msgs):
             # lookup parent link
             chain = urdf_robot.get_chain(urdf_robot.get_root(), link_name)
             link_name = chain[-3]
-        mesh_file, offset = find_mesh(link_name)
+        visual_type, arg, offset = find_mesh(link_name)
         marker.header.frame_id = link_name
         marker.header.stamp = rospy.Time.now()
-        marker.type = Marker.MESH_RESOURCE
+        if visual_type == 'mesh':
+            marker.type = Marker.MESH_RESOURCE
+            marker.scale.x = g_config.marker_scale
+            marker.scale.y = g_config.marker_scale
+            marker.scale.z = g_config.marker_scale
+            marker.mesh_resource = arg
+        else:
+            marker.type = Marker.CUBE
+            marker.scale.x = arg[0] * g_config.marker_scale
+            marker.scale.y = arg[1] * g_config.marker_scale
+            marker.scale.z = arg[2] * g_config.marker_scale
         if msg.state.state == ContactState.ON:
             marker.color.a = g_config.on_alpha
             marker.color.r = g_config.on_red
@@ -71,11 +88,7 @@ def callback(msgs):
             marker.color.r = g_config.off_red
             marker.color.g = g_config.off_green
             marker.color.b = g_config.off_blue
-        marker.scale.x = g_config.marker_scale
-        marker.scale.y = g_config.marker_scale
-        marker.scale.z = g_config.marker_scale
         marker.pose = offset
-        marker.mesh_resource = mesh_file
         marker.frame_locked = True
         marker.id = i
         if msg.state.state == ContactState.OFF:
